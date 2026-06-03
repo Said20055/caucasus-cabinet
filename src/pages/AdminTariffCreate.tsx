@@ -129,6 +129,9 @@ export default function AdminTariffCreate() {
   // Gift visibility
   const [showInGift, setShowInGift] = useState(true);
 
+  // Auto-transition to next tariff on first renewal (intro -> target)
+  const [selectedNextTariff, setSelectedNextTariff] = useState<number | null>(null);
+
   // New period for adding
   const [newPeriodDays, setNewPeriodDays] = useState<number | ''>(30);
   const [newPeriodPrice, setNewPeriodPrice] = useState<number | ''>(300);
@@ -155,6 +158,13 @@ export default function AdminTariffCreate() {
     queryKey: ['admin-tariffs-promo-groups'],
     queryFn: () => tariffsApi.getAvailablePromoGroups(),
   });
+
+  // Fetch all tariffs for the "next tariff" auto-transition selector
+  const { data: allTariffsResp } = useQuery({
+    queryKey: ['admin-tariffs-all'],
+    queryFn: () => tariffsApi.getTariffs(true),
+  });
+  const allTariffs = allTariffsResp?.tariffs ?? [];
 
   // Fetch tariff for editing
   const { isLoading: isLoadingTariff } = useQuery({
@@ -187,6 +197,7 @@ export default function AdminTariffCreate() {
       setTrafficTopupPackages(data.traffic_topup_packages || {});
       setTrafficResetMode(data.traffic_reset_mode || null);
       setShowInGift(data.show_in_gift ?? true);
+      setSelectedNextTariff(data.next_tariff_id ?? null);
       return data;
     }, []),
   });
@@ -234,6 +245,7 @@ export default function AdminTariffCreate() {
       is_daily: isDaily,
       daily_price_kopeks: isDaily ? toNumber(dailyPriceKopeks) : 0,
       traffic_reset_mode: trafficResetMode,
+      next_tariff_id: isDaily ? null : selectedNextTariff,
     };
 
     if (isEdit) {
@@ -802,6 +814,32 @@ export default function AdminTariffCreate() {
 
       {activeTab === 'extra' && (
         <div className="space-y-4">
+          {/* Next tariff auto-transition (intro -> target) */}
+          {tariffType !== 'daily' && (
+            <div className="card space-y-3">
+              <h4 className="text-sm font-medium text-dark-200">
+                {t('admin.tariffs.nextTariffTitle')}
+              </h4>
+              <p className="text-xs text-dark-500">{t('admin.tariffs.nextTariffHint')}</p>
+              <select
+                value={selectedNextTariff ?? ''}
+                onChange={(e) =>
+                  setSelectedNextTariff(e.target.value === '' ? null : Number(e.target.value))
+                }
+                className="input w-full"
+              >
+                <option value="">{t('admin.tariffs.nextTariffNone')}</option>
+                {allTariffs
+                  .filter((tr) => !tr.is_daily && (!isEdit || tr.id !== Number(id)))
+                  .map((tr) => (
+                    <option key={tr.id} value={tr.id}>
+                      {tr.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
           {/* Device addon */}
           <div className="card space-y-3">
             <h4 className="text-sm font-medium text-dark-200">

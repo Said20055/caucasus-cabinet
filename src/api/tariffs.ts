@@ -89,6 +89,9 @@ export interface TariffDetail {
   traffic_reset_mode: string | null; // 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING', 'NO_RESET', null = глобальная настройка
   // Внешний сквад RemnaWave
   external_squad_uuid: string | null;
+  // Авто-переход на следующий тариф при первом продлении (интро → целевой)
+  next_tariff_id: number | null;
+  next_tariff_name: string | null;
   created_at: string;
   updated_at: string | null;
 }
@@ -128,6 +131,8 @@ export interface TariffCreateRequest {
   traffic_reset_mode?: string | null;
   // Внешний сквад RemnaWave
   external_squad_uuid?: string | null;
+  // Авто-переход на следующий тариф (интро → целевой)
+  next_tariff_id?: number | null;
 }
 
 export interface ExternalSquadInfo {
@@ -172,6 +177,8 @@ export interface TariffUpdateRequest {
   traffic_reset_mode?: string | null;
   // Внешний сквад RemnaWave
   external_squad_uuid?: string | null;
+  // Авто-переход на следующий тариф (интро → целевой)
+  next_tariff_id?: number | null;
 }
 
 export interface TariffToggleResponse {

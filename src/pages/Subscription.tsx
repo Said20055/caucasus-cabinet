@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams } from 'react-router';
-import { subscriptionApi } from '../api/subscription';
+import { subscriptionApi, type AutopayTestResult } from '../api/subscription';
 import { WebBackButton } from '../components/WebBackButton';
 import { useDestructiveConfirm } from '../platform/hooks/useNativeDialog';
 import { usePlatform } from '../platform';
@@ -211,6 +211,11 @@ export default function Subscription() {
     is_unlimited: boolean;
   } | null>(null);
 
+  // Autopay diagnostic (debug) state
+  const [autopayTest, setAutopayTest] = useState<AutopayTestResult | null>(null);
+  const [autopayTestLoading, setAutopayTestLoading] = useState(false);
+  const [autopayTestError, setAutopayTestError] = useState<string | null>(null);
+
   // Detect multi-tariff mode from cached subscriptions-list
   const { data: multiSubData } = useQuery({
     queryKey: ['subscriptions-list'],
@@ -284,6 +289,36 @@ export default function Subscription() {
       queryClient.invalidateQueries({ queryKey: ['subscriptions-list'] });
     },
   });
+
+  const runAutopayTest = useCallback(
+    async (force: boolean) => {
+      if (
+        force &&
+        !window.confirm(
+          'Списать с привязанной карты прямо сейчас (реальные деньги)? Это попытается выполнить автоплатёж.',
+        )
+      )
+        return;
+      setAutopayTestLoading(true);
+      setAutopayTestError(null);
+      try {
+        const res = await subscriptionApi.testAutopay(force, subscriptionId);
+        setAutopayTest(res);
+        if (force) {
+          queryClient.invalidateQueries({ queryKey: ['subscription', subscriptionId] });
+        }
+      } catch (e) {
+        const msg =
+          (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+          (e as Error)?.message ||
+          'Error';
+        setAutopayTestError(String(msg));
+      } finally {
+        setAutopayTestLoading(false);
+      }
+    },
+    [subscriptionId, queryClient],
+  );
 
   // Devices query
   const { data: devicesData, isLoading: devicesLoading } = useQuery({
@@ -1156,6 +1191,89 @@ export default function Subscription() {
                       }}
                     />
                   </button>
+                </div>
+              )}
+
+              {/* ─── Autopay Diagnostic (debug) ─── */}
+              {!subscription.is_trial && !subscription.is_daily && (
+                <div
+                  className="rounded-[14px] p-3.5"
+                  style={{ background: g.innerBg, border: `1px solid ${g.innerBorder}` }}
+                >
+                  <div className="mb-2 text-sm font-semibold text-dark-50">
+                    🛠 Диагностика автоплатежа
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => runAutopayTest(false)}
+                      disabled={autopayTestLoading}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      style={{ background: zone.mainHex }}
+                    >
+                      {autopayTestLoading ? 'Проверяю…' : 'Проверить (без списания)'}
+                    </button>
+                    <button
+                      onClick={() => runAutopayTest(true)}
+                      disabled={autopayTestLoading}
+                      className="rounded-lg border px-3 py-1.5 text-xs font-semibold text-dark-50 disabled:opacity-50"
+                      style={{ borderColor: g.innerBorder }}
+                    >
+                      Списать сейчас
+                    </button>
+                  </div>
+
+                  {autopayTestError && (
+                    <div className="mt-2 text-[11px] text-red-400">⚠ {autopayTestError}</div>
+                  )}
+
+                  {autopayTest && (
+                    <div className="mt-3 space-y-1.5">
+                      <div className="text-[11px] text-dark-50/60">
+                        Вердикт:{' '}
+                        <span
+                          className="font-semibold"
+                          style={{
+                            color:
+                              autopayTest.verdict === 'would_charge' ||
+                              autopayTest.charge_result === 'created'
+                                ? '#34d399'
+                                : '#fbbf24',
+                          }}
+                        >
+                          {autopayTest.verdict}
+                          {autopayTest.charge_result ? ` · ${autopayTest.charge_result}` : ''}
+                        </span>
+                        {autopayTest.would_topup_kopeks
+                          ? ` · спишется ~${(autopayTest.would_topup_kopeks / 100).toFixed(2)} ₽`
+                          : ''}
+                      </div>
+                      {autopayTest.yookassa_payment && (
+                        <div className="text-[11px] text-dark-50/60">
+                          YooKassa: {autopayTest.yookassa_payment.id} ·{' '}
+                          {autopayTest.yookassa_payment.status} ·{' '}
+                          {autopayTest.yookassa_payment.paid ? 'оплачен' : 'в обработке'}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        {autopayTest.steps.map((s, i) => (
+                          <details
+                            key={i}
+                            className="rounded-md px-2 py-1 text-[11px]"
+                            style={{ background: g.hoverBg }}
+                          >
+                            <summary className="cursor-pointer list-none text-dark-50/80">
+                              {s.ok === true ? '✅' : s.ok === false ? '❌' : '⚪️'} {s.message}
+                            </summary>
+                            {s.detail && (
+                              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all text-[10px] text-dark-50/50">
+                                {JSON.stringify(s.detail, null, 2)}
+                              </pre>
+                            )}
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

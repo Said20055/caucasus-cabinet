@@ -559,6 +559,12 @@ const sections: AdminSection[] = [
         permission: 'servers:read',
       },
       {
+        name: 'admin.nav.externalSubs',
+        icon: 'server',
+        to: '/admin/external-subscriptions',
+        permission: 'servers:read',
+      },
+      {
         name: 'admin.nav.remnawave',
         icon: 'remnawave',
         to: '/admin/remnawave',

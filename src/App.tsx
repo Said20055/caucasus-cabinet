@@ -82,6 +82,7 @@ const AdminWheel = lazyWithRetry(() => import('./pages/AdminWheel'));
 const AdminTariffs = lazyWithRetry(() => import('./pages/AdminTariffs'));
 const AdminTariffCreate = lazyWithRetry(() => import('./pages/AdminTariffCreate'));
 const AdminServers = lazyWithRetry(() => import('./pages/AdminServers'));
+const AdminExternalSubs = lazyWithRetry(() => import('./pages/AdminExternalSubs'));
 const AdminServerEdit = lazyWithRetry(() => import('./pages/AdminServerEdit'));
 const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
 const AdminBanSystem = lazyWithRetry(() => import('./pages/AdminBanSystem'));
@@ -708,6 +709,16 @@ function App() {
             <PermissionRoute permission="servers:read">
               <LazyPage>
                 <AdminServers />
+              </LazyPage>
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/admin/external-subscriptions"
+          element={
+            <PermissionRoute permission="servers:read">
+              <LazyPage>
+                <AdminExternalSubs />
               </LazyPage>
             </PermissionRoute>
           }

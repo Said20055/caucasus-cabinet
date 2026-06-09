@@ -33,27 +33,6 @@ const bodyWithSubId = (
   subscriptionId != null ? { params: { subscription_id: subscriptionId } } : {},
 ];
 
-export interface AutopayTestStep {
-  key: string;
-  ok: boolean | null;
-  message: string;
-  detail?: Record<string, unknown> | null;
-}
-
-export interface AutopayTestResult {
-  verdict: string;
-  force_charge: boolean;
-  would_topup_kopeks?: number;
-  steps: AutopayTestStep[];
-  charge_result?: string;
-  yookassa_payment?: {
-    id?: string;
-    status?: string;
-    paid?: boolean;
-    amount_kopeks?: number;
-  };
-}
-
 export const subscriptionApi = {
   // ── Multi-tariff endpoints ──────────────────────────────────────────
 
@@ -340,15 +319,6 @@ export const subscriptionApi = {
       '/cabinet/subscription/autopay',
       { enabled, days_before: daysBefore },
       withSubId(subscriptionId),
-    );
-    return response.data;
-  },
-
-  testAutopay: async (forceCharge = false, subscriptionId?: number): Promise<AutopayTestResult> => {
-    const response = await apiClient.post<AutopayTestResult>(
-      '/cabinet/subscription/autopay/test',
-      {},
-      withSubId(subscriptionId, { force_charge: forceCharge }),
     );
     return response.data;
   },

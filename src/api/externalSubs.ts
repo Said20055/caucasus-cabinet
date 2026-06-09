@@ -3,6 +3,7 @@ import apiClient from './client';
 export interface ExternalConfigItem {
   id: number;
   name: string;
+  display_name: string | null;
   protocol: string | null;
   raw_link: string;
   is_selected: boolean;
@@ -90,6 +91,18 @@ export const externalSubsApi = {
     const { data } = await apiClient.put<ExternalSourceDetail>(`${BASE}/${id}/selection`, {
       selected_ids: selectedIds,
     });
+    return data;
+  },
+
+  renameConfig: async (
+    sourceId: number,
+    configId: number,
+    displayName: string | null,
+  ): Promise<ExternalSourceDetail> => {
+    const { data } = await apiClient.patch<ExternalSourceDetail>(
+      `${BASE}/${sourceId}/configs/${configId}`,
+      { display_name: displayName },
+    );
     return data;
   },
 };

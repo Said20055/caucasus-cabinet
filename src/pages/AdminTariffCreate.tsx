@@ -131,6 +131,8 @@ export default function AdminTariffCreate() {
 
   // Auto-transition to next tariff on first renewal (intro -> target)
   const [selectedNextTariff, setSelectedNextTariff] = useState<number | null>(null);
+  const [selectedNextPeriod, setSelectedNextPeriod] = useState<number | null>(null);
+  const [isOneTime, setIsOneTime] = useState(false);
 
   // New period for adding
   const [newPeriodDays, setNewPeriodDays] = useState<number | ''>(30);
@@ -166,6 +168,14 @@ export default function AdminTariffCreate() {
   });
   const allTariffs = allTariffsResp?.tariffs ?? [];
 
+  // Periods of the selected target tariff (for the auto-transition period selector)
+  const { data: nextTariffDetail } = useQuery({
+    queryKey: ['admin-tariff-detail', selectedNextTariff],
+    queryFn: () => tariffsApi.getTariff(selectedNextTariff as number),
+    enabled: selectedNextTariff != null,
+  });
+  const nextPeriods = (nextTariffDetail?.period_prices ?? []).map((p) => p.days);
+
   // Fetch tariff for editing
   const { isLoading: isLoadingTariff } = useQuery({
     queryKey: ['admin-tariff', id],
@@ -198,6 +208,8 @@ export default function AdminTariffCreate() {
       setTrafficResetMode(data.traffic_reset_mode || null);
       setShowInGift(data.show_in_gift ?? true);
       setSelectedNextTariff(data.next_tariff_id ?? null);
+      setSelectedNextPeriod(data.next_tariff_period_days ?? null);
+      setIsOneTime(data.is_one_time ?? false);
       return data;
     }, []),
   });
@@ -224,6 +236,14 @@ export default function AdminTariffCreate() {
   const handleSubmit = () => {
     const isDaily = tariffType === 'daily';
 
+    // Авто-переход требует выбранного периода целевого тарифа
+    if (!isDaily && selectedNextTariff != null && selectedNextPeriod == null) {
+      window.alert(
+        t('admin.tariffs.nextTariffPeriodRequired', 'Выберите период для авто-перехода'),
+      );
+      return;
+    }
+
     const data: TariffCreateRequest | TariffUpdateRequest = {
       name,
       description: description || undefined,
@@ -246,6 +266,8 @@ export default function AdminTariffCreate() {
       daily_price_kopeks: isDaily ? toNumber(dailyPriceKopeks) : 0,
       traffic_reset_mode: trafficResetMode,
       next_tariff_id: isDaily ? null : selectedNextTariff,
+      next_tariff_period_days: isDaily || !selectedNextTariff ? null : selectedNextPeriod,
+      is_one_time: isOneTime,
     };
 
     if (isEdit) {
@@ -823,9 +845,11 @@ export default function AdminTariffCreate() {
               <p className="text-xs text-dark-500">{t('admin.tariffs.nextTariffHint')}</p>
               <select
                 value={selectedNextTariff ?? ''}
-                onChange={(e) =>
-                  setSelectedNextTariff(e.target.value === '' ? null : Number(e.target.value))
-                }
+                onChange={(e) => {
+                  const v = e.target.value === '' ? null : Number(e.target.value);
+                  setSelectedNextTariff(v);
+                  setSelectedNextPeriod(null); // период выбирается заново под новый тариф
+                }}
                 className="input w-full"
               >
                 <option value="">{t('admin.tariffs.nextTariffNone')}</option>
@@ -837,8 +861,71 @@ export default function AdminTariffCreate() {
                     </option>
                   ))}
               </select>
+
+              {selectedNextTariff != null && (
+                <div className="space-y-1">
+                  <label className="text-xs text-dark-400">
+                    {t('admin.tariffs.nextTariffPeriod', 'Период целевого тарифа')}
+                  </label>
+                  <select
+                    value={selectedNextPeriod ?? ''}
+                    onChange={(e) =>
+                      setSelectedNextPeriod(e.target.value === '' ? null : Number(e.target.value))
+                    }
+                    className="input w-full"
+                  >
+                    <option value="">
+                      {t('admin.tariffs.nextTariffPeriodPlaceholder', '— выберите период —')}
+                    </option>
+                    {nextPeriods.map((d) => (
+                      <option key={d} value={d}>
+                        {t('admin.tariffs.daysCount', '{{n}} дн.', { n: d })}
+                      </option>
+                    ))}
+                  </select>
+                  {nextPeriods.length === 0 && (
+                    <p className="text-[11px] text-amber-400">
+                      {t(
+                        'admin.tariffs.nextTariffNoPeriods',
+                        'У целевого тарифа нет периодов — добавьте их в нём',
+                      )}
+                    </p>
+                  )}
+                  {selectedNextPeriod == null && nextPeriods.length > 0 && (
+                    <p className="text-[11px] text-amber-400">
+                      {t(
+                        'admin.tariffs.nextTariffPeriodRequired',
+                        'Выберите период для авто-перехода',
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
+
+          {/* One-time tariff */}
+          <div className="card space-y-2">
+            <label className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-dark-200">
+                  {t('admin.tariffs.oneTimeTitle', 'Одноразовый тариф')}
+                </div>
+                <p className="text-xs text-dark-500">
+                  {t(
+                    'admin.tariffs.oneTimeHint',
+                    'После первой успешной покупки тариф становится недоступен этому пользователю.',
+                  )}
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                className="h-5 w-5 shrink-0"
+                checked={isOneTime}
+                onChange={(e) => setIsOneTime(e.target.checked)}
+              />
+            </label>
+          </div>
 
           {/* Device addon */}
           <div className="card space-y-3">

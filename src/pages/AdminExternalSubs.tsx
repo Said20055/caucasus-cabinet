@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   externalSubsApi,
+  type ExternalConfigItem,
   type ExternalSourceDetail,
   type ExternalSourceListItem,
 } from '../api/externalSubs';
@@ -90,47 +91,13 @@ export default function AdminExternalSubs() {
     onError: apiError,
   });
 
-  const copyUrl = () => {
-    if (data?.public_url) navigator.clipboard?.writeText(data.public_url);
-  };
-
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-4">
-      <h1 className="text-xl font-bold text-dark-50">
-        {t('admin.externalSubs.title', 'Внешние подписки')}
-      </h1>
-
-      {/* Global subscription URL */}
-      <div className="card space-y-2 p-4">
-        <div className="text-sm font-semibold text-dark-100">
-          {t('admin.externalSubs.publicUrl', 'Ссылка на подписку (для пользователей)')}
-        </div>
-        {data?.enabled === false && (
-          <div className="text-[12px] text-amber-400">
-            {t(
-              'admin.externalSubs.disabled',
-              'Функция выключена: задайте EXTERNAL_SUBSCRIPTIONS_ENABLED=true в .env',
-            )}
-          </div>
-        )}
-        {data?.public_url ? (
-          <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded bg-dark-800/60 px-2 py-1.5 text-[12px] text-dark-200">
-              {data.public_url}
-            </code>
-            <button className="btn btn-secondary text-xs" onClick={copyUrl}>
-              {t('common.copy', 'Копировать')}
-            </button>
-          </div>
-        ) : (
-          <div className="text-[12px] text-dark-400">
-            {t(
-              'admin.externalSubs.noToken',
-              'Задайте EXTERNAL_SUB_TOKEN в .env, чтобы появилась ссылка',
-            )}
-          </div>
-        )}
-        <div className="text-[11px] text-dark-500">
+      <div>
+        <h1 className="text-xl font-bold text-dark-50">
+          {t('admin.externalSubs.title', 'Внешние подписки')}
+        </h1>
+        <div className="mt-0.5 text-[11px] text-dark-500">
           {t('admin.externalSubs.selectedTotal', 'Выбрано конфигов: {{n}}', {
             n: data?.total_selected ?? 0,
           })}
@@ -299,22 +266,15 @@ function SourceConfigs({
     <div className="mt-3 space-y-2 border-t border-dark-700 pt-3">
       <div className="max-h-72 space-y-1 overflow-y-auto">
         {detail.configs.map((c) => (
-          <label
+          <ConfigRow
             key={c.id}
-            className="flex items-center gap-2 rounded px-2 py-1 text-[12px] hover:bg-dark-800/40"
-            style={{ opacity: c.is_active ? 1 : 0.5 }}
-          >
-            <input type="checkbox" checked={current.has(c.id)} onChange={() => toggle(c.id)} />
-            <span className="rounded bg-dark-700 px-1 text-[10px] text-dark-300">
-              {c.protocol ?? '?'}
-            </span>
-            <span className="flex-1 truncate text-dark-100">{c.name}</span>
-            {!c.is_active && (
-              <span className="text-[10px] text-dark-500">
-                {t('admin.externalSubs.gone', 'нет в источнике')}
-              </span>
-            )}
-          </label>
+            config={c}
+            sourceId={detail.id}
+            checked={current.has(c.id)}
+            onToggle={() => toggle(c.id)}
+            onRenamed={onSaved}
+            onError={onError}
+          />
         ))}
         {detail.configs.length === 0 && (
           <div className="text-[12px] text-dark-400">
@@ -329,6 +289,104 @@ function SourceConfigs({
       >
         {t('admin.externalSubs.saveSelection', 'Сохранить выбор')}
       </button>
+    </div>
+  );
+}
+
+function ConfigRow({
+  config,
+  sourceId,
+  checked,
+  onToggle,
+  onRenamed,
+  onError,
+}: {
+  config: ExternalConfigItem;
+  sourceId: number;
+  checked: boolean;
+  onToggle: () => void;
+  onRenamed: () => void;
+  onError: (e: unknown) => void;
+}) {
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(config.display_name ?? '');
+
+  const renameMut = useMutation({
+    mutationFn: () => externalSubsApi.renameConfig(sourceId, config.id, value.trim() || null),
+    onSuccess: () => {
+      setEditing(false);
+      onRenamed();
+    },
+    onError,
+  });
+
+  const shown = config.display_name || config.name;
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded px-2 py-1 text-[12px] hover:bg-dark-800/40"
+      style={{ opacity: config.is_active ? 1 : 0.5 }}
+    >
+      <input type="checkbox" checked={checked} onChange={onToggle} />
+      <span className="rounded bg-dark-700 px-1 text-[10px] text-dark-300">
+        {config.protocol ?? '?'}
+      </span>
+      {editing ? (
+        <>
+          <input
+            className="input h-7 flex-1 text-[12px]"
+            value={value}
+            autoFocus
+            placeholder={config.name}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && renameMut.mutate()}
+          />
+          <button
+            className="text-[12px] text-emerald-400"
+            disabled={renameMut.isPending}
+            onClick={() => renameMut.mutate()}
+            title={t('common.save', 'Сохранить')}
+          >
+            ✓
+          </button>
+          <button
+            className="text-[12px] text-dark-400"
+            onClick={() => {
+              setEditing(false);
+              setValue(config.display_name ?? '');
+            }}
+          >
+            ✕
+          </button>
+        </>
+      ) : (
+        <>
+          <span className="flex-1 truncate text-dark-100">
+            {shown}
+            {config.display_name && (
+              <span className="ml-1 text-[10px] text-dark-500">
+                ({t('admin.externalSubs.customName', 'своё имя')})
+              </span>
+            )}
+          </span>
+          {!config.is_active && (
+            <span className="text-[10px] text-dark-500">
+              {t('admin.externalSubs.gone', 'нет в источнике')}
+            </span>
+          )}
+          <button
+            className="text-[12px] text-dark-400 hover:text-dark-100"
+            onClick={() => {
+              setValue(config.display_name ?? '');
+              setEditing(true);
+            }}
+            title={t('admin.externalSubs.rename', 'Переименовать')}
+          >
+            ✎
+          </button>
+        </>
+      )}
     </div>
   );
 }

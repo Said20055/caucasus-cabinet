@@ -92,6 +92,8 @@ export interface TariffDetail {
   // Авто-переход на следующий тариф при первом продлении (интро → целевой)
   next_tariff_id: number | null;
   next_tariff_name: string | null;
+  next_tariff_period_days: number | null;
+  is_one_time: boolean;
   created_at: string;
   updated_at: string | null;
 }
@@ -133,6 +135,8 @@ export interface TariffCreateRequest {
   external_squad_uuid?: string | null;
   // Авто-переход на следующий тариф (интро → целевой)
   next_tariff_id?: number | null;
+  next_tariff_period_days?: number | null;
+  is_one_time?: boolean;
 }
 
 export interface ExternalSquadInfo {
@@ -179,6 +183,8 @@ export interface TariffUpdateRequest {
   external_squad_uuid?: string | null;
   // Авто-переход на следующий тариф (интро → целевой)
   next_tariff_id?: number | null;
+  next_tariff_period_days?: number | null;
+  is_one_time?: boolean;
 }
 
 export interface TariffToggleResponse {
